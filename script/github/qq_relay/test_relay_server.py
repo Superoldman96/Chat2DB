@@ -153,6 +153,21 @@ class RelayHTTPTest(unittest.TestCase):
         self.assertTrue(body["duplicate"])
         self.state.onebot.send_group_message.assert_called_once()
 
+    def test_in_flight_duplicate_is_retryable_until_delivery_completes(self):
+        self.assertIsNone(self.state.deliveries.reserve("run-pending"))
+
+        with self.assertRaises(HTTPError) as context:
+            self._post(self._payload(delivery_id="run-pending"))
+
+        self.assertEqual(503, context.exception.code)
+        self.state.onebot.send_group_message.assert_not_called()
+
+        self.state.deliveries.complete("run-pending", "message-42")
+        status, body = self._post(self._payload(delivery_id="run-pending"))
+        self.assertEqual(200, status)
+        self.assertTrue(body["duplicate"])
+        self.assertEqual("message-42", body["message_id"])
+
     def test_invalid_token_is_rejected(self):
         with self.assertRaises(HTTPError) as context:
             self._post(self._payload(), token="wrong")

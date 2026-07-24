@@ -246,12 +246,16 @@ class RelayHandler(BaseHTTPRequestHandler):
             delivery_id, message = self._validate_payload(self._read_payload())
             existing = self.relay_state.deliveries.reserve(delivery_id)
             if existing is not None:
+                if existing == "pending":
+                    raise RequestError(
+                        HTTPStatus.SERVICE_UNAVAILABLE, "delivery is still in progress"
+                    )
                 self._send_json(
                     HTTPStatus.OK,
                     {
                         "ok": True,
                         "duplicate": True,
-                        "message_id": "unknown" if existing == "pending" else existing,
+                        "message_id": existing,
                     },
                 )
                 return
